@@ -9,12 +9,12 @@ import streamlit as st
 from model_pipeline import make_input
 
 ROOT = Path(__file__).resolve().parent
-st.set_page_config(page_title='CareerSignal | Prediksi Pindah Kerja', layout='wide', initial_sidebar_state='expanded')
+st.set_page_config(page_title='CareerSignal | Prediksi Pindah Kerja', layout='wide', initial_sidebar_state='collapsed')
 
 st.markdown('''<style>
 :root{--ink:#12243c;--muted:#64748b;--accent:#087f8c;--border:#dce5ee;}
 .stApp{background:#f1f5f9;color:var(--ink)}
-[data-testid="stMainBlockContainer"]{max-width:1450px;padding-top:2rem;padding-bottom:2.5rem}
+[data-testid="stMainBlockContainer"]{max-width:1120px;padding-top:2rem;padding-bottom:2.5rem}
 [data-testid="stSidebar"]{background:#10253e;color:#f0f6fc;border-right:1px solid #27425b}
 [data-testid="stSidebar"] p,[data-testid="stSidebar"] span,[data-testid="stSidebar"] h2,[data-testid="stSidebar"] h3{color:#e1ebf6}
 [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] small{color:#9db2c6}
@@ -53,6 +53,14 @@ body,p,button,label{font-family:'DM Sans',Arial,sans-serif}
 .badge{display:inline-block;border-radius:99px;padding:.4rem .7rem;font-size:.76rem;font-weight:800;margin-bottom:.4rem}
 .badge-positive{background:#fff1df;color:#a54b12}.badge-negative{background:#e4f6f0;color:#087756}
 .footer-note{color:#64748b;font-size:.77rem;text-align:center;margin-top:1.6rem}
+.step-strip{display:flex;gap:8px;margin:1rem 0 1.25rem;flex-wrap:wrap}
+.step-chip{flex:1;min-width:110px;background:#e7edf4;color:#60738a;padding:.75rem .8rem;border-radius:10px;font-weight:700;font-size:.85rem;line-height:1.35}
+.step-chip.active{background:#087f8c;color:#fff}.step-chip.done{background:#d9f0eb;color:#126e65}
+.step-chip small{display:block;opacity:.8;font-size:.7rem;font-weight:600}
+.field-hint{font-size:.82rem;color:#52677d;line-height:1.5;margin:-.4rem 0 .75rem;min-height:2.45rem}
+.result-box{border-radius:20px;padding:1.6rem;border:1px solid #d0e7e4;background:linear-gradient(135deg,#f0fbf7,#fff);margin:1rem 0}
+.result-box.positive{background:linear-gradient(135deg,#fff4e7,#fff);border-color:#ecd2b9}
+.result-heading{font-size:clamp(1.5rem,3vw,2.15rem);font-weight:800;letter-spacing:-.04em;color:#12243c;margin:.3rem 0 .6rem;line-height:1.18}
 @media(max-width:700px){.hero{padding:1.4rem}.hero-sub{font-size:.92rem}[data-testid="stMainBlockContainer"]{padding:1rem .7rem}.result-score{font-size:2.3rem}}
 </style>''', unsafe_allow_html=True)
 
@@ -74,7 +82,7 @@ except (FileNotFoundError, ImportError, ValueError) as exc:
 
 m = meta['metrics']; threshold = meta['threshold']
 st.sidebar.markdown('''<div class="logo-block"><div class="logo-mark">CS</div><div><div class="logo-text">CareerSignal</div><div class="logo-caption">HR ANALYTICS / BENGKEL KODING</div></div></div>''', unsafe_allow_html=True)
-st.sidebar.caption('Sistem prediksi keinginan pindah kerja peserta pelatihan. Proyek UAS Data Science.')
+st.sidebar.caption('Proyek UAS Data Science. Detail teknis model tersedia di tab Kinerja model.')
 st.sidebar.markdown('---')
 st.sidebar.markdown(f'''<div class="side-stat"><small>MODEL TERPILIH</small><strong>Random Forest</strong><small>100 pohon · depth 14</small></div>
 <div class="side-stat"><small>DATA SETELAH DEDUPLIKASI</small><strong>{meta['unique_rows']:,}</strong><small>Profil unik</small></div>
@@ -82,37 +90,32 @@ st.sidebar.markdown(f'''<div class="side-stat"><small>MODEL TERPILIH</small><str
 st.sidebar.markdown('---')
 st.sidebar.caption('Model untuk pembelajaran, bukan dasar tunggal pengambilan keputusan rekrutmen. Tidak menyimpan input pengguna.')
 
-st.markdown('''<div class="hero"><span class="hero-eyebrow">DATA SCIENCE CAPSTONE · UAS 2026/2027</span><div class="hero-title">Prediksi Keinginan Pindah Kerja</div><p class="hero-sub">Kenali kecenderungan peserta pelatihan dengan model machine learning yang telah dievaluasi secara terkontrol, dari profil karier hingga aktivitas pelatihan.</p></div>''', unsafe_allow_html=True)
-
-cards = st.columns(4)
-for col, label, value in zip(cards, ['Accuracy', 'Precision kelas 1', 'Recall kelas 1', 'F1-score kelas 1'], [m['accuracy'],m['precision'],m['recall'],m['f1']]):
-    col.metric(label, f'{value:.2%}')
-st.caption(f'Metrik pada {meta["test_rows"]:,} data uji historis yang tidak digunakan dalam pelatihan. Kelas 1 = ingin pindah kerja.')
-tab_pred, tab_eval, tab_method = st.tabs(['Prediksi peserta', 'Evaluasi model', 'Metodologi'])
+st.markdown('''<div class="hero"><span class="hero-eyebrow">CAREERSIGNAL · UAS 2026/2027</span><div class="hero-title">Apakah peserta cenderung ingin pindah kerja?</div><p class="hero-sub">Jawab pertanyaan tentang profil, pekerjaan, dan pelatihan dalam tiga langkah. Tidak perlu memahami machine learning untuk menggunakannya.</p></div>''', unsafe_allow_html=True)
+tab_pred, tab_eval, tab_method = st.tabs(['Mulai prediksi', 'Kinerja model', 'Cara kerja'])
 
 LABELS = {
-    'kode_kota':('Kode kota','Kode kota anonim dari dataset; bukan nama kota.'),
-    'jenis_kelamin':('Jenis kelamin','Dapat dikosongkan jika tidak diketahui.'),
-    'pendidikan':('Pendidikan terakhir','Jenjang pendidikan peserta.'),
-    'jurusan':('Jurusan','Bidang studi utama.'),
-    'status_kuliah':('Status kuliah','Status perkuliahan saat ini.'),
-    'indeks_pembangunan_kota':('Indeks pembangunan kota','Skala 0–1; kosong jika tidak diketahui.'),
-    'pengalaman_relevan':('Pengalaman relevan','Pengalaman terkait bidang data science.'),
-    'lama_pengalaman_thn':('Lama pengalaman kerja','Dalam tahun; <1 dan >20 tersedia.'),
-    'ukuran_perusahaan':('Ukuran perusahaan','Jumlah karyawan; jika tidak diketahui, pilih kosong.'),
-    'tipe_perusahaan':('Tipe perusahaan','Jenis tempat bekerja saat ini.'),
-    'jeda_pindah_kerja_thn':('Jeda pindah kerja','Tahun sejak perpindahan kerja terakhir.'),
-    'skor_kepuasan_kerja':('Skor kepuasan kerja','Skala 0–100.'),
-    'persentase_kenaikan_gaji':('Kenaikan gaji (%)','Persentase kenaikan gaji.'),
-    'jarak_rumah_ke_kantor_km':('Jarak rumah–kantor (km)','Jarak dari tempat tinggal ke kantor.'),
+    'kode_kota':('Kode kota tempat tinggal','Contoh K103. Ini kode anonim pada dataset, bukan nama kota; jangan menebak jika tidak tahu.'),
+    'jenis_kelamin':('Jenis kelamin','Pilih sesuai data peserta; boleh tidak diketahui.'),
+    'pendidikan':('Pendidikan terakhir','Contoh SMA, S1 (sarjana), atau S2 (magister).'),
+    'jurusan':('Bidang studi / jurusan','STEM berarti sains, teknologi, teknik, dan matematika; humaniora mencakup ilmu budaya.'),
+    'status_kuliah':('Apakah sedang kuliah?','Pilih tidak kuliah, penuh waktu, atau paruh waktu.'),
+    'indeks_pembangunan_kota':('Indeks pembangunan kota','Angka 0–1 dari dataset. Contoh 0,920; bukan IPM skala 0–100. Kosongkan jika tidak tahu.'),
+    'pengalaman_relevan':('Pernah bekerja di bidang terkait?','Pilih Ada bila memiliki pengalaman terkait bidang data science.'),
+    'lama_pengalaman_thn':('Sudah berapa lama bekerja?','Total pengalaman kerja, dalam tahun.'),
+    'ukuran_perusahaan':('Berapa jumlah karyawan perusahaan?','Pilih kisaran jumlah seluruh karyawan, bukan hanya tim Anda.'),
+    'tipe_perusahaan':('Jenis perusahaan saat ini','Contoh swasta (PT), startup, pemerintah, atau LSM.'),
+    'jeda_pindah_kerja_thn':('Kapan terakhir berganti pekerjaan?','Dalam tahun; pilih belum pernah jika belum pernah berganti pekerjaan.'),
+    'skor_kepuasan_kerja':('Seberapa puas dengan pekerjaan?','Skor 0–100. Contoh 20 = kurang puas, 80 = sangat puas.'),
+    'persentase_kenaikan_gaji':('Berapa persen kenaikan gaji?','Contoh gaji naik 10%: masukkan 10. Jika tidak naik, masukkan 0.'),
+    'jarak_rumah_ke_kantor_km':('Jarak rumah ke kantor (km)','Masukkan jarak satu arah, misalnya 12 km.'),
     'estimasi_gaji_bulanan_juta':('Estimasi gaji (juta Rp/bulan)','Contoh: 8,5 berarti Rp8.500.000.'),
-    'tanggal_daftar':('Tanggal pendaftaran','Rentang data pelatihan 2023–2024.'),
-    'sumber_info':('Sumber informasi','Sumber mengetahui pelatihan.'),
-    'skor_tes_awal':('Skor tes awal','Skala 0–100.'),
-    'jam_pelatihan':('Jam pelatihan','Jumlah jam yang telah diselesaikan.'),
-    'jumlah_modul_selesai':('Modul selesai','Jumlah modul yang telah diselesaikan.'),
-    'kegiatan_ekstrakurikuler':('Kegiatan ekstrakurikuler','Aktivitas tambahan peserta.'),
-    'sertifikasi_it':('Sertifikasi IT','Sertifikasi atau pelatihan profesional yang dimiliki.')
+    'tanggal_daftar':('Tanggal mendaftar pelatihan','Contoh 14/12/2023. Data pelatihan model berasal dari tahun 2023–2024.'),
+    'sumber_info':('Tahu program pelatihan dari mana?','Contoh Instagram, LinkedIn, teman, atau website kampus.'),
+    'skor_tes_awal':('Nilai tes sebelum pelatihan','Masukkan nilai 0–100, jika tersedia.'),
+    'jam_pelatihan':('Berapa jam pelatihan yang sudah diikuti?','Total jam, bukan jumlah hari; contoh 48 jam.'),
+    'jumlah_modul_selesai':('Berapa modul yang sudah selesai?','Jumlah materi yang telah diselesaikan, bukan total materi.'),
+    'kegiatan_ekstrakurikuler':('Kegiatan di luar pekerjaan / kuliah','Contoh seni, olahraga atau relawan. Pilih Tidak ada bila memang tidak mengikuti kegiatan.'),
+    'sertifikasi_it':('Sertifikasi IT yang dimiliki','Pilih sertifikasi yang sesuai. Tidak ada berbeda dari tidak diketahui.')
 }
 RANGES = {
     'indeks_pembangunan_kota':(0.,1.,.001,'%.3f'), 'skor_tes_awal':(0.,100.,.1,'%.1f'),
@@ -124,13 +127,74 @@ RANGES = {
 def to_date(value):
     return datetime.strptime(value,'%m/%d/%Y').date() if value else None
 
-def apply_example(name):
-    for k,v in meta['examples'][name].items():
-        st.session_state['field_'+k] = to_date(v) if k=='tanggal_daftar' else v
-    st.session_state.pop('prediction', None)
+STAGES = [
+    ('Profil & pendidikan', 'Ceritakan latar belakang peserta.', ['kode_kota','indeks_pembangunan_kota','jenis_kelamin','pendidikan','jurusan','status_kuliah']),
+    ('Pekerjaan & penghasilan', 'Ceritakan kondisi pekerjaan saat ini.', ['pengalaman_relevan','lama_pengalaman_thn','ukuran_perusahaan','tipe_perusahaan','jeda_pindah_kerja_thn','skor_kepuasan_kerja','persentase_kenaikan_gaji','estimasi_gaji_bulanan_juta','jarak_rumah_ke_kantor_km']),
+    ('Pelatihan & aktivitas', 'Ceritakan pengalaman mengikuti pelatihan.', ['tanggal_daftar','sumber_info','skor_tes_awal','jam_pelatihan','jumlah_modul_selesai','kegiatan_ekstrakurikuler','sertifikasi_it'])
+]
+assert sorted(k for _,_,items in STAGES for k in items)==sorted(meta['features']), 'Fitur aplikasi berbeda dengan model.'
+if 'draft' not in st.session_state:
+    st.session_state.draft={k:None for k in meta['features']}
+if 'step' not in st.session_state:
+    st.session_state.step=0
 
-def display_option(value):
-    if value is None: return 'Tidak diketahui / kosong'
+def clear_widgets():
+    for k in meta['features']:
+        st.session_state.pop('field_'+k,None)
+
+def reset_form():
+    clear_widgets()
+    st.session_state.draft={k:None for k in meta['features']}
+    st.session_state.step=0
+    st.session_state.pop('prediction',None)
+    st.session_state.pop('example_name',None)
+    st.session_state.pop('form_error',None)
+
+def apply_example(name):
+    clear_widgets()
+    st.session_state.draft=dict(meta['examples'][name])
+    st.session_state.example_name=name
+    st.session_state.step=3
+    predict_draft()
+
+def predict_draft():
+    values=st.session_state.draft
+    frame=make_input(values,meta['features'])
+    score=float(model.predict_proba(frame)[0,list(model.classes_).index(1)])
+    label=int(model.predict(frame)[0]); assert label==int(score>=threshold)
+    dt=to_date(values.get('tanggal_daftar'))
+    st.session_state.prediction={'score':score,'label':label,'date_outside':bool(dt and not date(2023,1,1)<=dt<=date(2024,11,30)),
+        'missing':sum(v is None for v in values.values()), 'input':dict(values)}
+
+def edit_form():
+    clear_widgets()
+    st.session_state.step=0
+    st.session_state.pop('prediction',None)
+
+def move_step(back=False):
+    current=st.session_state.step
+    for key in STAGES[current][2]:
+        value=st.session_state.get('field_'+key)
+        if key=='tanggal_daftar' and value is not None:
+            value=value.strftime('%m/%d/%Y')
+        st.session_state.draft[key]=value
+    st.session_state.pop('form_error',None)
+    if back:
+        st.session_state.step=max(0,current-1)
+    elif current<2:
+        st.session_state.step=current+1
+    elif all(v is None for v in st.session_state.draft.values()):
+        st.session_state.form_error='Belum ada informasi yang diisi. Isi setidaknya satu jawaban atau coba profil simulasi.'
+    else:
+        predict_draft()
+        st.session_state.step=3
+
+def display_option(value, name=None):
+    if value is None: return 'Tidak tahu / belum tersedia'
+    if name=='pendidikan':return {'s1':'S1 (Sarjana)','s2':'S2 (Magister)','s3':'S3 (Doktor)','sma':'SMA / sederajat','sd':'SD'}.get(value,value.upper())
+    if name=='jurusan' and value=='stem': return 'STEM — Sains, teknologi, teknik, matematika'
+    if name=='ukuran_perusahaan':return ('Kurang dari 10' if value=='<10' else '10.000 atau lebih' if value=='10000+' else value.replace('-', '–'))+' karyawan'
+    if name in ['lama_pengalaman_thn','jeda_pindah_kerja_thn'] and value.isdigit():return value+' tahun'
     if value.upper() in {'S1','S2','S3','SD','SMA','STEM','LSM'} or value.startswith('k') and value[1:].isdigit(): return value.upper()
     if value=='<1':return 'Kurang dari 1 tahun'
     if value=='>20':return 'Lebih dari 20 tahun'
@@ -140,22 +204,26 @@ def display_option(value):
 def field(name):
     key='field_'+name; label, help_text=LABELS[name]
     if key not in st.session_state:
-        v=meta['defaults'][name]; st.session_state[key]=to_date(v) if name=='tanggal_daftar' else v
+        v=st.session_state.draft[name]; st.session_state[key]=to_date(v) if name=='tanggal_daftar' else v
     if name=='tanggal_daftar':
-        v=st.date_input(label, min_value=date(2000,1,1),max_value=date(2100,12,31), format='DD/MM/YYYY',key=key,help=help_text)
+        v=st.date_input(label, value=None, min_value=date(2000,1,1),max_value=date(2100,12,31), format='DD/MM/YYYY',key=key)
         return v.strftime('%m/%d/%Y') if v else None
     if name in RANGES:
         lo,hi,step,fmt=RANGES[name]
-        return st.number_input(label,min_value=lo,max_value=hi,step=step,format=fmt,key=key,help=help_text)
+        return st.number_input(label,min_value=lo,max_value=hi,step=step,format=fmt,value=None,key=key,placeholder='Isi angka jika diketahui')
     options=[None]+meta['options'][name]
-    return st.selectbox(label,options,format_func=display_option,key=key,help=help_text)
+    if name in ['lama_pengalaman_thn','jeda_pindah_kerja_thn']:
+        options=[None]+sorted(options[1:],key=lambda v:0 if v in ('<1','belum pernah') else float(v[1:])+1 if v.startswith('>') else int(v))
+    return st.selectbox(label,options,format_func=lambda v:display_option(v,name),key=key)
 
 def fields_section(title, items, values):
     st.markdown(f'<div class="section-title">{title}</div>',unsafe_allow_html=True)
     for i in range(0,len(items),2):
         row=st.columns(2)
         for col,name in zip(row,items[i:i+2]):
-            with col: values[name]=field(name)
+            with col:
+                values[name]=field(name)
+                st.markdown(f'<div class="field-hint">{LABELS[name][1]}</div>',unsafe_allow_html=True)
 
 def show_result(result):
     if result is None:
@@ -163,41 +231,69 @@ def show_result(result):
         return
     score, label = result['score'], result['label']; positive=bool(label)
     badge_class='badge-positive' if positive else 'badge-negative'
-    result_text='Ingin pindah kerja' if positive else 'Tidak ingin pindah kerja'
-    note='Skor model mencapai ambang keputusan kelas 1.' if positive else 'Skor model berada di bawah ambang keputusan kelas 1.'
-    st.markdown(f'''<div class="panel"><div class="panel-kicker">HASIL PREDIKSI</div><span class="badge {badge_class}">KELAS {label}</span><div class="panel-title">{result_text}</div><div class="result-score">{score:.1%}</div><p class="panel-body">Skor model untuk kelas ingin pindah</p><div class="score-track"><div class="score-fill" style="width:{score*100:.4f}%"></div><div class="threshold-mark" style="left:{threshold*100:.4f}%"></div></div><p class="panel-body">Ambang keputusan: {threshold:.2%}</p><hr style="border:0;border-top:1px solid #e0e9f0;margin:1rem 0"><p class="panel-body">{note}</p></div>''',unsafe_allow_html=True)
-    st.caption('Hasil dari profil terakhir yang dikirim. Skor bukan probabilitas risiko terkalibrasi. Oversampling mengubah distribusi data latih; hasil tidak menjamin keputusan seseorang.')
+    result_text='Peserta diprediksi cenderung ingin pindah kerja' if positive else 'Peserta diprediksi cenderung tidak ingin pindah kerja'
+    note='Nilai lebih tinggi dari atau sama dengan batas keputusan model.' if positive else 'Nilai lebih rendah dari batas keputusan model.'
+    st.markdown(f'''<div class="result-box {'positive' if positive else ''}"><div class="panel-kicker">HASIL PREDIKSI PESERTA</div><span class="badge {badge_class}">{'CENDERUNG PINDAH' if positive else 'CENDERUNG BERTAHAN'}</span><div class="result-heading">{result_text}</div><div class="result-score">{score:.1%}</div><p class="panel-body">Skor kecenderungan pindah menurut model (0–100%)</p><div class="score-track"><div class="score-fill" style="width:{score*100:.4f}%"></div><div class="threshold-mark" style="left:{threshold*100:.4f}%"></div></div><p class="panel-body">Garis pembatas: {threshold:.2%}. {note}</p></div>''',unsafe_allow_html=True)
+    st.caption('Skor adalah penilaian internal model, bukan peluang pasti seseorang akan pindah kerja. Hasil ini hanya prediksi, bukan keputusan nyata.')
+    if result.get('missing',0):
+        st.info(f'{result["missing"]} dari 22 isian tidak diketahui. Model menangani data kosong secara otomatis. Lengkapi informasi jika memungkinkan; pola data kosong dapat memengaruhi prediksi.')
     if result.get('date_outside'):
         st.warning('Tanggal di luar rentang dataset 2023–2024. Interpretasikan hasil dengan hati-hati.')
 
 with tab_pred:
-    st.subheader('Masukkan profil peserta')
-    st.caption('Gunakan data nyata atau pilih profil simulasi untuk demonstrasi. Input kosong tetap diproses pipeline.')
-    cols=st.columns(3)
-    for col,name in zip(cols,meta['examples']):
-        col.button(name,key='example_'+name,on_click=apply_example,args=(name,),use_container_width=True,help='Isi form dengan profil simulasi, bukan data peserta asli.')
-    left,right=st.columns([2.1,1.0],gap='large')
-    with left:
-        with st.form('participant_form'):
+    step=st.session_state.step
+    if step==0:
+        with st.container(border=True):
+            st.markdown('**Belum punya data? Coba contoh langsung.**')
+            st.caption('Dua contoh profil fiktif yang bisa langsung menampilkan hasil. Kamu juga bisa mengubah jawabannya setelah itu.')
+            a,b=st.columns(2)
+            a.button('Contoh: karier stabil',key='example_Karier stabil',on_click=apply_example,args=('Karier stabil',),use_container_width=True)
+            b.button('Contoh: eksplorasi karier',key='example_Eksplorasi karier',on_click=apply_example,args=('Eksplorasi karier',),use_container_width=True)
+    strip=''
+    for i,title in enumerate([x[0] for x in STAGES]+['Hasil prediksi']):
+        kind='active' if i==step else 'done' if i<step else ''
+        strip+=f'<div class="step-chip {kind}"><small>{"LANGKAH "+str(i+1) if i<3 else "SELESAI"}</small>{title}</div>'
+    st.markdown(f'<div class="step-strip">{strip}</div>',unsafe_allow_html=True)
+    if step<3:
+        title,desc,items=STAGES[step]
+        st.subheader(f'Langkah {step+1} dari 3 — {title}')
+        st.caption(desc+' Isi informasi yang diketahui saja. Pilih Tidak tahu atau biarkan angka/tanggal kosong jika tidak tersedia. Jangan menebak.')
+        if st.session_state.get('example_name'):
+            st.info('Sedang mengubah profil contoh: '+st.session_state.example_name)
+        with st.form('participant_step_'+str(step)):
             values={}
-            fields_section('01  ·  Profil dan pendidikan',['kode_kota','indeks_pembangunan_kota','jenis_kelamin','pendidikan','jurusan','status_kuliah'],values)
-            fields_section('02  ·  Pengalaman dan pekerjaan',['pengalaman_relevan','lama_pengalaman_thn','ukuran_perusahaan','tipe_perusahaan','jeda_pindah_kerja_thn','skor_kepuasan_kerja','persentase_kenaikan_gaji','estimasi_gaji_bulanan_juta','jarak_rumah_ke_kantor_km'],values)
-            fields_section('03  ·  Pelatihan dan aktivitas',['tanggal_daftar','sumber_info','skor_tes_awal','jam_pelatihan','jumlah_modul_selesai','kegiatan_ekstrakurikuler','sertifikasi_it'],values)
-            submitted=st.form_submit_button('Jalankan prediksi',type='primary',use_container_width=True)
-        if submitted:
-            frame=make_input(values,meta['features'])
-            score=float(model.predict_proba(frame)[0,list(model.classes_).index(1)])
-            label=int(model.predict(frame)[0]);assert label==int(score>=threshold)
-            dt=to_date(values['tanggal_daftar'])
-            st.session_state.prediction={'score':score,'label':label,'date_outside': bool(dt and not date(2023,1,1)<=dt<=date(2024,11,30))}
-            st.success(f'Prediksi selesai: {"Ingin pindah kerja" if label else "Tidak ingin pindah kerja"} · skor kelas 1: {score:.1%}. Lihat panel hasil untuk detail.')
-    with right:
-        show_result(st.session_state.get('prediction'))
-        st.markdown('''<div class="panel"><div class="panel-kicker">CARA KERJA</div><div class="panel-title">Input → Pipeline → Prediksi</div><p class="panel-body">1. Isi 22 fitur mentah.<br>2. Pipeline membersihkan, mengisi missing, melakukan encoding dan scaling.<br>3. Random Forest menghitung skor kelas 1.<br>4. Skor dibandingkan dengan threshold hasil CV.</p></div>''',unsafe_allow_html=True)
-        st.markdown('''<div class="panel"><div class="panel-kicker">AUDIT LEAKAGE</div><p class="panel-body">ID peserta, kode departemen, status resign dan aktivitas lamaran LinkedIn tidak dipakai model akhir. Input tersebut sengaja tidak ditampilkan.</p></div>''',unsafe_allow_html=True)
+            fields_section(f'{len(items)} pertanyaan',items,values)
+            back,forward=st.columns([1,2])
+            with back: st.form_submit_button('Kembali',disabled=step==0,use_container_width=True,on_click=move_step,args=(True,))
+            with forward: st.form_submit_button('Lanjutkan' if step<2 else 'Lihat hasil prediksi',type='primary',use_container_width=True,on_click=move_step)
+        if st.session_state.get('form_error'):
+            st.warning(st.session_state.form_error)
+        st.button('Mulai dari awal (hapus isian)',key='reset_draft',on_click=reset_form)
+    else:
+        if st.session_state.get('example_name'): st.caption('Profil simulasi: '+st.session_state.example_name+' (data fiktif)')
+        result=st.session_state.get('prediction')
+        show_result(result)
+        if result:
+            st.markdown('**Apa yang saya lakukan dengan hasil ini?**')
+            st.write('Gunakan sebagai bahan pertimbangan untuk memahami kebutuhan peserta. Jangan menganggap prediksi sebagai bukti seseorang pasti akan pindah atau bertahan.')
+            with st.expander('Lihat 22 jawaban yang dipakai model'):
+                for title,desc,items in STAGES:
+                    st.markdown('**'+title+'**')
+                    rows=[{'Pertanyaan':LABELS[k][0], 'Jawaban':('Tidak diketahui' if result['input'][k] is None else display_option(str(result['input'][k]),k) if k not in RANGES and k!='tanggal_daftar' else str(result['input'][k]))} for k in items]
+                    st.dataframe(pd.DataFrame(rows),hide_index=True,use_container_width=True)
+            with st.expander('Detail teknis hasil (untuk UAS)'):
+                st.write(f'Kelas: {result["label"]} · Random Forest · threshold OOF {threshold:.5f} · 22 fitur mentah.')
+                st.caption('Skor tidak terkalibrasi karena model dilatih menggunakan oversampling. Data kosong diimputasi oleh pipeline yang dipelajari dari data latih.')
+        a,b=st.columns(2)
+        a.button('Ubah jawaban',on_click=edit_form,use_container_width=True)
+        b.button('Prediksi peserta baru',type='primary',on_click=reset_form,use_container_width=True)
 
 with tab_eval:
     st.subheader('Kinerja pada data uji')
+    cards = st.columns(4)
+    for col,label,value in zip(cards,['Ketepatan keseluruhan','Ketepatan prediksi pindah','Deteksi peserta ingin pindah','F1-score'],[m['accuracy'],m['precision'],m['recall'],m['f1']]):
+        col.metric(label,f'{value:.2%}')
+    st.caption(f'Diuji pada {meta["test_rows"]:,} data historis yang tidak dipakai pelatihan. Accuracy = ketepatan keseluruhan, precision = ketepatan prediksi ingin pindah, recall = bagian peserta yang benar-benar ingin pindah dan berhasil terdeteksi.')
     c1,c2=st.columns([1,1],gap='large')
     with c1:
         st.markdown('**Confusion matrix**')
